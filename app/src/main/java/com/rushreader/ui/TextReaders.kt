@@ -29,7 +29,7 @@ import com.rushreader.data.Doc
 import com.rushreader.data.Settings
 import com.rushreader.docx.DocxBlock
 import com.rushreader.docx.DocxDocument
-import com.rushreader.docx.DocxParser
+import com.rushreader.docx.parseRich
 import com.rushreader.docx.TxtLoader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -79,7 +79,7 @@ fun DocxReader(doc: Doc, s: Settings, onTap: () -> Unit, onProgress: (Int, Int) 
         try {
             data = withContext(Dispatchers.IO) {
                 val f = CacheManager.copyToCache(ctx, Uri.parse(doc.uri))
-                try { DocxParser.parse(f) } catch (e: Throwable) { f.delete(); throw e }
+                try { parseRich(doc.type, f) } catch (e: Throwable) { f.delete(); throw e }
             }
         } catch (e: CancellationException) { throw e }
         catch (e: Throwable) { err = friendlyError(e) }
@@ -89,7 +89,7 @@ fun DocxReader(doc: Doc, s: Settings, onTap: () -> Unit, onProgress: (Int, Int) 
     val d = data
     when {
         err != null -> ErrorBox(err!!)
-        d == null -> Loading("Đang đọc DOCX…")
+        d == null -> Loading("Đang đọc ${doc.type.label}…")
         else -> {
             val state = rememberLazyListState(initialFirstVisibleItemIndex = doc.page.coerceIn(0, (d.blocks.size - 1).coerceAtLeast(0)))
             LaunchedEffect(state) { snapshotFlow { state.firstVisibleItemIndex }.collectLatest { delay(400); onProgress(it, d.blocks.size) } }
@@ -106,7 +106,7 @@ fun DocxReader(doc: Doc, s: Settings, onTap: () -> Unit, onProgress: (Int, Int) 
                             val scale = when (b.level) { 1 -> 1.6f; 2 -> 1.4f; 3 -> 1.25f; 4, 5, 6 -> 1.1f; else -> 1f }
                             val sz = s.textSp * scale
                             Row(Modifier.padding(start = (b.listLevel * 18).dp, top = if (b.level > 0) 8.dp else 0.dp)) {
-                                if (b.list) Text("•  ", color = RC.Accent, fontSize = sz.sp, fontFamily = ff)
+                                if (b.marker != null) Text(b.marker + "  ", color = RC.Accent, fontSize = sz.sp, fontFamily = ff)
                                 Text(b.text, color = if (b.level == 1) RC.Accent else RC.Text, fontSize = sz.sp, lineHeight = (sz * 1.5f).sp,
                                     fontWeight = if (b.level > 0) FontWeight.Bold else null, textAlign = b.align, fontFamily = ff, modifier = Modifier.weight(1f))
                             }

@@ -46,7 +46,7 @@ fun ReaderScreen(vm: MainViewModel, doc: Doc) {
                 when (doc.type) {
                     DocType.PDF -> PdfReader(doc, vm.settings, onTap, onProgress)
                     DocType.TXT -> TxtReader(doc, vm.settings, onTap, onProgress)
-                    DocType.DOCX -> DocxReader(doc, vm.settings, onTap, onProgress)
+                    DocType.DOCX, DocType.EPUB, DocType.RTF, DocType.XLSX, DocType.PPTX -> DocxReader(doc, vm.settings, onTap, onProgress)
                     else -> UnsupportedView(doc)
                 }
             }
@@ -78,7 +78,6 @@ private fun UnsupportedView(doc: Doc) {
     val ctx = LocalContext.current
     val reason = when (doc.type) {
         DocType.DOC -> "Định dạng .doc (Word 97-2003, nhị phân OLE2) có cấu trúc khác hẳn DOCX. Rush Reader chưa có bộ đọc DOC nên không hiển thị được. Hãy lưu lại thành DOCX hoặc PDF, hoặc mở bằng ứng dụng khác."
-        DocType.EPUB, DocType.RTF, DocType.XLSX, DocType.PPTX -> "Định dạng ${doc.type.label} chưa được hỗ trợ ở phiên bản này (dự kiến Phase 5). Bạn có thể mở bằng ứng dụng khác."
         else -> "Không nhận dạng được định dạng của file này."
     }
     Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {

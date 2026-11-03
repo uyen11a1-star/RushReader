@@ -7,7 +7,7 @@ import java.io.File
 
 enum class DocType(val label: String, val supported: Boolean) {
     PDF("PDF", true), DOCX("DOCX", true), DOC("DOC", false), TXT("TXT", true),
-    EPUB("EPUB", false), RTF("RTF", false), XLSX("XLSX", false), PPTX("PPTX", false),
+    EPUB("EPUB", true), RTF("RTF", true), XLSX("XLSX", true), PPTX("PPTX", true),
     UNKNOWN("?", false);
 
     companion object {

@@ -231,17 +231,20 @@ private fun SettingsScreen(vm: MainViewModel) {
                 Toast.makeText(ctx, "Đã xoá ${formatSize(freed)} cache", Toast.LENGTH_SHORT).show()
             }, modifier = Modifier.padding(top = 8.dp)) { Text("Xoá cache tạm", color = RC.Text) }
         }
-        Section("Định dạng hỗ trợ (v0.1)") {
+        Section("Định dạng hỗ trợ (v0.2)") {
             Text(
-                "• PDF: đọc được (engine PdfRenderer của Android). Chưa có tìm kiếm văn bản; PDF có mật khẩu chưa mở được.\n" +
-                "• DOCX: văn bản, tiêu đề, danh sách (chỉ dấu •), bảng dạng chữ, ảnh PNG/JPG/GIF/WebP. Chưa có ảnh EMF/WMF, số thứ tự danh sách, header/footer.\n" +
+                "• PDF: đọc được (engine PdfRenderer của Android). Thu nhỏ xem nhiều trang (2–4 cột), phóng to tới 4x. Chưa tìm kiếm văn bản; PDF có mật khẩu chưa mở được.\n" +
+                "• DOCX: văn bản, tiêu đề, danh sách có số, bảng dạng chữ, ảnh PNG/JPG/GIF/WebP. Chưa có ảnh EMF/WMF, header/footer.\n" +
+                "• EPUB: đọc theo thứ tự spine, tiêu đề, đoạn, ảnh. EPUB có DRM không mở được.\n" +
+                "• RTF: văn bản + đậm/nghiêng/gạch chân. Chưa có bảng và ảnh.\n" +
+                "• XLSX: hiển thị giá trị từng sheet dạng bảng (tối đa 3000 dòng × 40 cột/sheet). Ngày tháng có thể hiện dạng số; không có công thức, biểu đồ, định dạng ô.\n" +
+                "• PPTX: chỉ văn bản từng slide. Chưa có hình, hiệu ứng, ghi chú.\n" +
                 "• TXT: UTF-8, UTF-16 (có BOM), Windows-1258; chỉ đọc 6 MB đầu của file quá lớn.\n" +
-                "• DOC (Word 97-2003): chưa đọc được — cấu trúc khác DOCX.\n" +
-                "• EPUB, RTF, XLSX, PPTX: chưa hỗ trợ (dự kiến Phase 5).",
+                "• DOC (Word 97-2003): chưa đọc được — cấu trúc khác DOCX.",
                 color = RC.Sub, fontSize = 13.sp, lineHeight = 19.sp
             )
         }
-        Text("Rush Reader 0.1.0", color = RC.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
+        Text("Rush Reader 0.2.0", color = RC.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
     }
 }
 

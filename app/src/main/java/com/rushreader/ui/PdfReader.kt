@@ -10,8 +10,9 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -77,24 +78,33 @@ fun PdfReader(doc: Doc, settings: Settings, onTap: () -> Unit, onProgress: (Int,
 private fun PdfPages(engine: PdfEngine, doc: Doc, settings: Settings, onTap: () -> Unit, onProgress: (Int, Int) -> Unit) {
     val density = LocalDensity.current
     val screenWpx = with(density) { LocalConfiguration.current.screenWidthDp.dp.roundToPx() }
-    var zoom by remember { mutableFloatStateOf(1f) }
+    var zoom by remember { mutableFloatStateOf(1f) }   // 1..4 khi cols == 1
+    var cols by remember { mutableIntStateOf(1) }      // 1..4 cột (chế độ xem bao quát)
     var pinch by remember { mutableFloatStateOf(1f) }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = doc.page.coerceIn(0, engine.pageCount - 1))
+    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = doc.page.coerceIn(0, engine.pageCount - 1))
     val hScroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collectLatest { delay(400); onProgress(it, engine.pageCount) }
+    LaunchedEffect(gridState) {
+        snapshotFlow { gridState.firstVisibleItemIndex }.collectLatest { delay(400); onProgress(it, engine.pageCount) }
     }
 
-    val contentWpx = (screenWpx * zoom).roundToInt()
-    val widthDp: Dp = with(density) { contentWpx.toDp() }
+    val widthDp: Dp = with(density) { (screenWpx * zoom).roundToInt().toDp() }
+    val gap = 8.dp
+    val sidePad = if (cols > 1) gap else 0.dp
+    val pageWdp: Dp = (widthDp - sidePad * 2 - gap * (cols - 1)) / cols
+    val pageWpx = with(density) { pageWdp.toPx() }.roundToInt().coerceAtLeast(32)
+
+    fun zoomIn() { if (cols > 1) cols -= 1 else zoom = (zoom + 0.5f).coerceAtMost(4f) }
+    fun zoomOut() { if (cols == 1 && zoom > 1.01f) zoom = (zoom - 0.5f).coerceAtLeast(1f) else { zoom = 1f; cols = (cols + 1).coerceAtMost(4) } }
 
     Column(Modifier.fillMaxSize()) {
         Box(
             Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0F0F11)).clipToBounds()
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = { onTap() }, onDoubleTap = { zoom = if (zoom > 1.05f) 1f else 2f })
+                    detectTapGestures(onTap = { onTap() }, onDoubleTap = {
+                        if (cols > 1) cols = 1 else zoom = if (zoom > 1.05f) 1f else 2f
+                    })
                 }
                 .pointerInput(Unit) {
                     awaitEachGesture {
@@ -105,42 +115,55 @@ private fun PdfPages(engine: PdfEngine, doc: Doc, settings: Settings, onTap: () 
                             if (ev.changes.size >= 2) {
                                 multi = true
                                 val z = ev.calculateZoom()
-                                if (z != 1f) pinch = (pinch * z).coerceIn(1f / zoom, 4f / zoom)
+                                if (z != 1f) pinch = (pinch * z).coerceIn(0.4f, if (cols == 1) 4f / zoom else 2.5f)
                                 ev.changes.forEach { if (it.positionChanged()) it.consume() }
                             }
                         } while (ev.changes.any { it.pressed })
-                        if (multi) { zoom = (zoom * pinch).coerceIn(1f, 4f); pinch = 1f }
+                        if (multi) {
+                            if (cols == 1) {
+                                val e = zoom * pinch
+                                if (e < 0.75f) { zoom = 1f; cols = 2 } else zoom = e.coerceIn(1f, 4f)
+                            } else {
+                                if (pinch < 0.8f) cols = (cols + 1).coerceAtMost(4) else if (pinch > 1.25f) cols -= 1
+                            }
+                            pinch = 1f
+                        }
                     }
                 }
         ) {
             Box(Modifier.fillMaxSize().horizontalScroll(hScroll)) {
-                LazyColumn(
-                    state = listState,
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(cols),
+                    state = gridState,
                     modifier = Modifier.width(widthDp).fillMaxHeight().graphicsLayer {
                         scaleX = pinch; scaleY = pinch; transformOrigin = TransformOrigin(0.5f, 0f)
                     },
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = sidePad, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                    horizontalArrangement = Arrangement.spacedBy(gap)
                 ) {
                     items(engine.pageCount, key = { it }) { i ->
-                        PdfPageItem(engine, i, contentWpx, widthDp, settings.quality, settings.invertPdf)
+                        PdfPageItem(engine, i, pageWpx, pageWdp, settings.quality, settings.invertPdf)
                     }
                 }
             }
         }
-        // Thanh chuyển trang
-        Row(Modifier.fillMaxWidth().background(RC.Surface).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Thanh chuyển trang + zoom
+        Row(Modifier.fillMaxWidth().background(RC.Surface).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             var sliding by remember { mutableStateOf<Float?>(null) }
-            val cur = (listState.firstVisibleItemIndex + 1).coerceIn(1, engine.pageCount)
-            Text("${(sliding?.roundToInt() ?: cur)} / ${engine.pageCount}", color = RC.Text, fontSize = 13.sp, modifier = Modifier.widthIn(min = 72.dp))
+            val cur = (gridState.firstVisibleItemIndex + 1).coerceIn(1, engine.pageCount)
+            Text("${(sliding?.roundToInt() ?: cur)} / ${engine.pageCount}", color = RC.Text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp).widthIn(min = 64.dp))
             if (engine.pageCount > 1) Slider(
                 value = sliding ?: cur.toFloat(),
                 onValueChange = { sliding = it },
-                onValueChangeFinished = { val t = sliding; sliding = null; if (t != null) scope.launch { listState.scrollToItem(t.roundToInt() - 1) } },
+                onValueChangeFinished = { val t = sliding; sliding = null; if (t != null) scope.launch { gridState.scrollToItem(t.roundToInt() - 1) } },
                 valueRange = 1f..engine.pageCount.toFloat(),
                 colors = SliderDefaults.colors(thumbColor = RC.Accent, activeTrackColor = RC.Accent),
                 modifier = Modifier.weight(1f)
             ) else Spacer(Modifier.weight(1f))
+            TextButton(onClick = { zoomOut() }, enabled = !(cols == 4), contentPadding = PaddingValues(0.dp), modifier = Modifier.size(44.dp)) { Text("−", color = RC.Accent, fontSize = 24.sp) }
+            Text(if (cols > 1) "$cols cột" else "${(zoom * 100).roundToInt()}%", color = RC.Sub, fontSize = 12.sp, modifier = Modifier.widthIn(min = 44.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            TextButton(onClick = { zoomIn() }, enabled = !(cols == 1 && zoom >= 4f), contentPadding = PaddingValues(0.dp), modifier = Modifier.size(44.dp)) { Text("+", color = RC.Accent, fontSize = 24.sp) }
         }
     }
 }
